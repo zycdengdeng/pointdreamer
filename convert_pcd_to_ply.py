@@ -38,7 +38,7 @@ def convert_pcd_to_ply(pcd_path, output_ply_path=None, max_points=30000, downsam
     print(f"Original point count: {len(points)}")
     print(f"Point cloud bounds: min={points.min(axis=0)}, max={points.max(axis=0)}")
 
-    # Downsample if necessary
+    # Downsample only if point count exceeds max_points
     if len(points) > max_points:
         print(f"Downsampling from {len(points)} to {max_points} points using {downsample_method} method...")
 
@@ -75,6 +75,8 @@ def convert_pcd_to_ply(pcd_path, output_ply_path=None, max_points=30000, downsam
                 colors = colors_voxel
 
         print(f"After downsampling: {len(points)} points")
+    else:
+        print(f"Point count ({len(points)}) is within limit ({max_points}), keeping all original points")
 
     # Convert color range from [0,1] to [0,255]
     colors_255 = (colors * 255).astype(np.uint8)
