@@ -51,19 +51,28 @@ def convert_pcd_to_ply(pcd_path, output_ply_path=None, max_points=30000, downsam
         elif downsample_method == 'voxel':
             # Voxel downsampling (better preserves structure)
             # Estimate voxel size to get approximately max_points
+            # Use a smaller multiplier to avoid over-downsampling
             bbox_size = (points.max(axis=0) - points.min(axis=0)).max()
-            voxel_size = bbox_size / (max_points ** (1/3))
+            voxel_size = bbox_size / (max_points ** (1/3)) * 0.5  # Use 0.5x to get more points
 
             pcd_downsampled = pcd.voxel_down_sample(voxel_size=voxel_size)
+            points_voxel = np.asarray(pcd_downsampled.points)
+            colors_voxel = np.asarray(pcd_downsampled.colors)
 
-            # If still too many points, use uniform sampling
-            if len(pcd_downsampled.points) > max_points:
-                indices = np.random.choice(len(pcd_downsampled.points), max_points, replace=False)
-                points = np.asarray(pcd_downsampled.points)[indices]
-                colors = np.asarray(pcd_downsampled.colors)[indices]
+            # If too many points, use uniform sampling to reduce
+            if len(points_voxel) > max_points:
+                indices = np.random.choice(len(points_voxel), max_points, replace=False)
+                points = points_voxel[indices]
+                colors = colors_voxel[indices]
+            # If too few points, fall back to uniform sampling from original
+            elif len(points_voxel) < max_points * 0.5:  # If less than 50% of target
+                print(f"Voxel downsampling yielded too few points ({len(points_voxel)}), using uniform sampling instead...")
+                indices = np.random.choice(len(points), max_points, replace=False)
+                points = points[indices]
+                colors = colors[indices]
             else:
-                points = np.asarray(pcd_downsampled.points)
-                colors = np.asarray(pcd_downsampled.colors)
+                points = points_voxel
+                colors = colors_voxel
 
         print(f"After downsampling: {len(points)} points")
 
@@ -79,6 +88,12 @@ def convert_pcd_to_ply(pcd_path, output_ply_path=None, max_points=30000, downsam
         output_ply_path = pcd_path.replace('.pcd', '.ply')
         if output_ply_path == pcd_path:  # If no .pcd extension
             output_ply_path = pcd_path + '.ply'
+
+    # Create output directory if it doesn't exist
+    output_dir = os.path.dirname(output_ply_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Created output directory: {output_dir}")
 
     # Create PLY vertex array
     vertex_data = []
